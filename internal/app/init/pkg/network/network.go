@@ -50,7 +50,8 @@ func Setup(data *userdata.UserData) (err error) {
 		if netconf.Bond == nil {
 			log.Println("bringing up normal interface")
 			if err := ifup(netconf.Interface); err != nil {
-				return err
+				log.Printf("failed to bring up interface: %+v", err)
+				continue
 			}
 		} else {
 			// TODO test
@@ -87,33 +88,34 @@ func Setup(data *userdata.UserData) (err error) {
 		}
 
 		if netconf.DHCP {
-			// Set up dhcp renewals every 5m
+			log.Printf("setting up DHCP on interface %s", netconf.Interface)
 			go func() {
 				for {
-					// TODO pick this out of the dhclient/netconf response
-					// so we can request less frequently
-					// Example response:  #ValidLifetime
-					// [   12.399713] [talos] [initramfs] netconf: &{Addresses:[{IPNet:{IP:147.75.64.19 Mask:fffffffe} PreferredLifetime:0 ValidLifetime:1800}] Classless:[] DNSServers:[147.75.207.207 147.75.207.208] DNSSearchList:[] Routers:[147.75.64.18]}
-					time.Sleep(5 * time.Minute)
-					log.Println("renewing dhcp lease")
-					if err = dhclient(netconf.Interface); err != nil {
+					log.Println("obtaining DHCP lease")
+					var anetconf *netboot.NetConf
+					if anetconf, err = dhclient(netconf.Interface); err != nil {
 						// Probably need to do something better here but not sure there's much to do
 						log.Println("failed to renew dhcp lease, ", err)
+						continue
 					}
+					if len(anetconf.Addresses) != 1 {
+						log.Printf("expected 1 address in DHCP response, got %d", len(anetconf.Addresses))
+						continue
+					}
+					wait := time.Duration(anetconf.Addresses[0].ValidLifetime / 2)
+					time.Sleep(wait * time.Second)
 				}
 			}()
-			// single/initial dhcp request
-			if err = dhclient(netconf.Interface); err != nil {
-				return err
-			}
 		} else {
 			addr, _ := netlink.ParseAddr(netconf.CIDR)
 			var link netlink.Link
 			if link, err = netlink.LinkByName(netconf.Interface); err != nil {
-				return err
+				log.Printf("failed to get interface %s: %+v", netconf.Interface, err)
+				continue
 			}
 			if err = netlink.AddrAdd(link, addr); err != nil {
-				return err
+				log.Printf("failed to add %s to %s: %+v", addr, netconf.Interface, err)
+				continue
 			}
 		}
 	}
@@ -121,10 +123,7 @@ func Setup(data *userdata.UserData) (err error) {
 	return nil
 }
 
-func dhclient(ifname string) error {
-	var err error
-	var netconf *netboot.NetConf
-
+func dhclient(ifname string) (netconf *netboot.NetConf, err error) {
 	// TODO: Figure out how we want to pass around ntp servers
 	modifiers := []dhcpv4.Modifier{
 		dhcpv4.WithRequestedOptions(
@@ -136,13 +135,13 @@ func dhclient(ifname string) error {
 	}
 
 	if netconf, err = dhclient4(ifname, modifiers...); err != nil {
-		return err
+		return nil, err
 	}
 	if err = netboot.ConfigureInterface(ifname, netconf); err != nil {
-		return err
+		return nil, err
 	}
 
-	return err
+	return netconf, err
 }
 
 // nolint: gocyclo
@@ -210,5 +209,9 @@ func defaultNetworkSetup() (err error) {
 		return err
 	}
 
-	return dhclient("eth0")
+	if _, err = dhclient("eth0"); err != nil {
+		return err
+	}
+
+	return nil
 }
