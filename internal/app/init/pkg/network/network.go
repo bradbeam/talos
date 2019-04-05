@@ -24,7 +24,7 @@ func Setup(data *userdata.UserData) (err error) {
 	// If no networking config is defined,
 	// bring up lo and eth0 with dhcp on eth0
 	if data == nil || data.Networking.OS == nil {
-		log.Println("Default network setup")
+		log.Println("default network setup")
 		return defaultNetworkSetup()
 	}
 
@@ -38,24 +38,23 @@ func Setup(data *userdata.UserData) (err error) {
 	*/
 
 	// Always bring up lo by default
-	log.Println("Bringing up lo")
+	log.Println("bringing up lo")
 	if err = ifup("lo"); err != nil {
 		return err
 	}
 
 	// Iterate through defined network devices
-	log.Println("Starting up network devices")
-	log.Printf("%+v\n", data.Networking.OS.Devices)
+	log.Println("starting up network devices")
 	for _, netconf := range data.Networking.OS.Devices {
-		log.Printf("%+v\n", netconf)
 		// Normal Interface
 		if netconf.Bond == nil {
-			log.Println("Bringing up normal interface")
+			log.Println("bringing up normal interface")
 			if err := ifup(netconf.Interface); err != nil {
 				return err
 			}
 		} else {
-			log.Println("Bringing up bonded interface")
+			// TODO test
+			log.Println("bringing up bonded interface")
 			bond := netlink.NewLinkBond(netlink.LinkAttrs{Name: netconf.Interface})
 			if _, ok := netlink.StringToBondModeMap[netconf.Bond.Mode]; !ok {
 				return errors.New(fmt.Sprintf("invalid bond mode for s", netconf.Interface))
@@ -75,7 +74,7 @@ func Setup(data *userdata.UserData) (err error) {
 			// Set up bonding if defined
 			var slaveLink netlink.Link
 			for _, bondInterface := range netconf.Bond.Interfaces {
-				log.Printf("Enslaving %s for %s\n", bondInterface, netconf.Interface)
+				log.Printf("enslaving %s for %s\n", bondInterface, netconf.Interface)
 				slaveLink, err = netlink.LinkByName(bondInterface)
 				if err != nil {
 					return err
@@ -88,12 +87,13 @@ func Setup(data *userdata.UserData) (err error) {
 		}
 
 		if netconf.DHCP {
-			log.Printf("DHCPing %s\n", netconf.Interface)
 			// Set up dhcp renewals every 5m
 			go func() {
 				for {
 					// TODO pick this out of the dhclient/netconf response
 					// so we can request less frequently
+					// Example response:  #ValidLifetime
+					// [   12.399713] [talos] [initramfs] netconf: &{Addresses:[{IPNet:{IP:147.75.64.19 Mask:fffffffe} PreferredLifetime:0 ValidLifetime:1800}] Classless:[] DNSServers:[147.75.207.207 147.75.207.208] DNSSearchList:[] Routers:[147.75.64.18]}
 					time.Sleep(5 * time.Minute)
 					log.Println("renewing dhcp lease")
 					if err = dhclient(netconf.Interface); err != nil {
@@ -102,16 +102,19 @@ func Setup(data *userdata.UserData) (err error) {
 					}
 				}
 			}()
-			//dhcp request
-			return dhclient(netconf.Interface)
+			// single/initial dhcp request
+			if err = dhclient(netconf.Interface); err != nil {
+				return err
+			}
 		} else {
-			log.Printf("Setting static ip for %s\n", netconf.Interface)
 			addr, _ := netlink.ParseAddr(netconf.CIDR)
 			var link netlink.Link
 			if link, err = netlink.LinkByName(netconf.Interface); err != nil {
 				return err
 			}
-			return netlink.AddrAdd(link, addr)
+			if err = netlink.AddrAdd(link, addr); err != nil {
+				return err
+			}
 		}
 	}
 
