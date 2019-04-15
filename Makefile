@@ -7,10 +7,10 @@ VPATH = $(PATH)
 KERNEL_IMAGE ?= autonomy/kernel:8fd9a83
 TOOLCHAIN_IMAGE ?= autonomy/toolchain:989387e
 DOCKER_ARGS ?=
-BUILDKIT_VERSION ?= v0.3.3
+BUILDKIT_VERSION ?= v0.4.0
 BUILDKIT_IMAGE ?= moby/buildkit:$(BUILDKIT_VERSION)
 BUILDKIT_HOST ?= tcp://0.0.0.0:1234
-BUILDKIT_CACHE ?= -v $(HOME)/.buildkit:/var/lib/buildkit
+#BUILDKIT_CACHE ?= -v $(HOME)/.buildkit:/var/lib/buildkit
 BUILDKIT_CONTAINER_NAME ?= talos-buildkit
 BUILDKIT_CONTAINER_STOPPED := $(shell docker ps --filter name=$(BUILDKIT_CONTAINER_NAME) --filter status=exited --format='{{.Names}}' 2>/dev/null)
 BUILDKIT_CONTAINER_RUNNING := $(shell docker ps --filter name=$(BUILDKIT_CONTAINER_NAME) --filter status=running --format='{{.Names}}' 2>/dev/null)
@@ -21,17 +21,17 @@ endif
 ifeq ($(UNAME_S),Darwin)
 BUILDCTL_ARCHIVE := https://github.com/moby/buildkit/releases/download/$(BUILDKIT_VERSION)/buildkit-$(BUILDKIT_VERSION).darwin-amd64.tar.gz
 endif
-BINDIR ?= /usr/local/bin
+BINDIR ?= ./bin
 CONFORM_VERSION ?= 57c9dbd
 
 COMMON_ARGS = --progress=plain
 COMMON_ARGS += --frontend=dockerfile.v0
 COMMON_ARGS += --local context=.
 COMMON_ARGS += --local dockerfile=.
-COMMON_ARGS += --frontend-opt build-arg:KERNEL_IMAGE=$(KERNEL_IMAGE)
-COMMON_ARGS += --frontend-opt build-arg:TOOLCHAIN_IMAGE=$(TOOLCHAIN_IMAGE)
-COMMON_ARGS += --frontend-opt build-arg:SHA=$(SHA)
-COMMON_ARGS += --frontend-opt build-arg:TAG=$(TAG)
+COMMON_ARGS += --opt build-arg:KERNEL_IMAGE=$(KERNEL_IMAGE)
+COMMON_ARGS += --opt build-arg:TOOLCHAIN_IMAGE=$(TOOLCHAIN_IMAGE)
+COMMON_ARGS += --opt build-arg:SHA=$(SHA)
+COMMON_ARGS += --opt build-arg:TAG=$(TAG)
 
 # to allow tests to run containerd
 DOCKER_TEST_ARGS = --security-opt seccomp:unconfined --privileged -v /var/lib/containerd/
@@ -44,9 +44,12 @@ builddeps: gitmeta buildctl
 gitmeta:
 	GO111MODULE=off go get github.com/talos-systems/gitmeta
 
-buildctl:
+buildctl: $(BINDIR)/buildctl
+
+$(BINDIR)/buildctl:
+	@mkdir $(BINDIR)
 	@wget -qO - $(BUILDCTL_ARCHIVE) | \
-		sudo tar -zxf - -C $(BINDIR) --strip-components 1 bin/buildctl
+		tar -zxf - -C $(BINDIR) --strip-components 1 bin/buildctl
 
 .PHONY: buildkitd
 buildkitd:
@@ -77,57 +80,48 @@ enforce:
 ci: builddeps buildkitd
 
 base: buildkitd
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=docker \
-		--exporter-opt output=build/$@.tar \
-		--exporter-opt name=docker.io/autonomy/$@:$(TAG) \
-		--frontend-opt target=$@ \
+		--output type=docker,dest=build/$@.tar,name=docker.io/autonomy/$@:$(TAG) \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 	@docker load < build/$@.tar
 
 kernel: buildkitd
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=local \
-		--exporter-opt output=build \
-		--frontend-opt target=$@ \
+    --output type=local,dest=build \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 
 initramfs: buildkitd
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=local \
-		--exporter-opt output=build \
-		--frontend-opt target=$@ \
+    --output type=local,dest=build \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 
 rootfs: buildkitd hyperkube etcd coredns pause osd trustd proxyd ntpd
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=local \
-		--exporter-opt output=build \
-		--frontend-opt target=$@ \
+    --output type=local,dest=build \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 
 installer: buildkitd
 	@mkdir -p build
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=docker \
-		--exporter-opt output=build/$@.tar \
-		--exporter-opt name=docker.io/autonomy/$@:$(TAG) \
-		--exporter-opt push=$(PUSH) \
-		--frontend-opt target=$@ \
+		--output type=docker,dest=build/$@.tar,name=docker.io/autonomy/$@:$(TAG),push=$(PUSH) \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 	@docker load < build/$@.tar
 
 proto: buildkitd
-	buildctl --addr $(BUILDKIT_HOST) \
+	$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=local \
-		--exporter-opt output=./ \
-		--frontend-opt target=$@ \
+    --output type=local,dest=./ \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 
 talos-gce: installer
@@ -139,13 +133,10 @@ talos-raw: installer
 	@docker run --rm -v /dev:/dev -v $(PWD)/build:/out --privileged $(DOCKER_ARGS) autonomy/installer:$(TAG) disk -n rootfs -l
 
 talos: buildkitd
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=docker \
-		--exporter-opt output=build/$@.tar \
-		--exporter-opt name=docker.io/autonomy/$@:$(TAG) \
-		--exporter-opt push=$(PUSH) \
-		--frontend-opt target=$@ \
+		--output type=docker,dest=build/$@.tar,name=docker.io/autonomy/$@:$(TAG),push=$(PUSH) \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 	@docker load < build/$@.tar
 
@@ -154,13 +145,10 @@ release: all talos-raw talos-gce talos
 
 test: buildkitd
 	@mkdir -p build
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=docker \
-		--exporter-opt output=build/$@.tar \
-		--exporter-opt name=docker.io/autonomy/$@:$(TAG) \
-		--exporter-opt push=$(PUSH) \
-		--frontend-opt target=$@ \
+		--output type=docker,dest=build/$@.tar,name=docker.io/autonomy/$@:$(TAG),push=$(PUSH) \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 	@docker load < build/$@.tar
 	@docker run -i --rm $(DOCKER_TEST_ARGS) autonomy/$@:$(TAG) /bin/test.sh --short
@@ -169,78 +157,67 @@ test: buildkitd
 		cp ./.artifacts/coverage.txt coverage.txt
 
 lint: buildkitd
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--frontend-opt target=$@ \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 
 osctl-linux-amd64: buildkitd
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=local \
-		--exporter-opt output=build \
-		--frontend-opt target=$@ \
+    --output type=local,dest=build \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 
 osctl-darwin-amd64: buildkitd
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=local \
-		--exporter-opt output=build \
-		--frontend-opt target=$@ \
+    --output type=local,dest=build \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 
 osinstall-linux-amd64: buildkitd
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=local \
-		--exporter-opt output=build \
-		--frontend-opt target=$@ \
+    --output type=local,dest=build \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 
 udevd: buildkitd
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--frontend-opt target=$@ \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 
 images:
 	mkdir -p images
 
 osd: buildkitd images
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=docker \
-		--exporter-opt output=images/$@.tar \
-		--exporter-opt name=docker.io/autonomy/$@:$(TAG) \
-		--frontend-opt target=$@ \
+		--output type=docker,dest=images/$@.tar,name=docker.io/autonomy/$@:$(TAG) \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 
 trustd: buildkitd images
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=docker \
-		--exporter-opt output=images/$@.tar \
-		--exporter-opt name=docker.io/autonomy/$@:$(TAG) \
-		--frontend-opt target=$@ \
+		--output type=docker,dest=images/$@.tar,name=docker.io/autonomy/$@:$(TAG) \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 
 proxyd: buildkitd images
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=docker \
-		--exporter-opt output=images/$@.tar \
-		--exporter-opt name=docker.io/autonomy/$@:$(TAG) \
-		--frontend-opt target=$@ \
+		--output type=docker,dest=images/$@.tar,name=docker.io/autonomy/$@:$(TAG) \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 
 ntpd: buildkitd images
-	@buildctl --addr $(BUILDKIT_HOST) \
+	@$(BINDIR)/buildctl --addr $(BUILDKIT_HOST) \
 		build \
-		--exporter=docker \
-		--exporter-opt output=images/$@.tar \
-		--exporter-opt name=docker.io/autonomy/$@:$(TAG) \
-		--frontend-opt target=$@ \
+		--output type=docker,dest=images/$@.tar,name=docker.io/autonomy/$@:$(TAG) \
+		--opt target=$@ \
 		$(COMMON_ARGS)
 
 hyperkube: images
