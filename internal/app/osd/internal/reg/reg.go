@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/containerd/cgroups"
@@ -62,6 +63,7 @@ func (r *Registrator) Kubeconfig(ctx context.Context, in *empty.Empty) (data *pr
 // Processes implements the proto.OSDServer interface.
 // nolint: gocyclo
 func (r *Registrator) Processes(ctx context.Context, in *proto.ProcessesRequest) (reply *proto.ProcessesReply, err error) {
+	log.Println("Im in reg.Processes")
 	client, err := containerd.New(defaults.DefaultAddress)
 	if err != nil {
 		return nil, err
@@ -76,20 +78,43 @@ func (r *Registrator) Processes(ctx context.Context, in *proto.ProcessesRequest)
 		return nil, err
 	}
 
-	processes := []*proto.Process{}
+	images, err := client.ListImages(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+	imageMap := make(map[string]string, len(images))
+	for _, image := range images {
+		imageMap[image.Target().Digest.String()] = image.Name()
+	}
 
+	processes := []*proto.Process{}
+	// https://github.com/containerd/containerd/blob/master/container.go#L48
 	for _, container := range containers {
+		//log.Printf("Container: %+v", container)
+		info, err := container.Info(ctx)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		log.Printf("Info: %+v", info)
 		task, err := container.Task(ctx, nil)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
+		//log.Printf("Task: %+v", task)
 
 		image, err := container.Image(ctx)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
+		log.Printf("Image: %+v", image)
+		log.Println(image.Name())
+		/*
+			simage, err := client.GetImage(ctx, image.Name())
+			log.Printf("Image: %+v", simage)
+		*/
 
 		status, err := task.Status(ctx)
 		if err != nil {
@@ -97,12 +122,15 @@ func (r *Registrator) Processes(ctx context.Context, in *proto.ProcessesRequest)
 			continue
 		}
 
+		// info.Image
+
 		process := &proto.Process{
 			Namespace: in.Namespace,
-			Id:        container.ID(),
-			Image:     image.Name(),
-			Pid:       task.Pid(),
-			Status:    strings.ToUpper(string(status.Status)),
+			Id:        path.Join(info.Labels["io.kubernetes.pod.namespace"], info.Labels["io.kubernetes.pod.name"]),
+			Image:     imageMap[info.Image],
+			//Image:     image.
+			Pid:    task.Pid(),
+			Status: strings.ToUpper(string(status.Status)),
 		}
 
 		processes = append(processes, process)
