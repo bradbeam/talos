@@ -12,7 +12,6 @@ require (
 	github.com/containerd/fifo v0.0.0-20180307165137-3d5202aec260 // indirect
 	github.com/containerd/typeurl v0.0.0-20180627222232-a93fcdb778cd
 	github.com/coreos/go-systemd v0.0.0-20180828140353-eee3db372b31 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/distribution v2.7.1-0.20190205005809-0d3efadf0154+incompatible // indirect
 	github.com/docker/go-events v0.0.0-20170721190031-9461782956ad // indirect
 	github.com/docker/go-units v0.3.3 // indirect
@@ -21,7 +20,6 @@ require (
 	github.com/fullsailor/pkcs7 v0.0.0-20180613152042-8306686428a5
 	github.com/godbus/dbus v4.1.0+incompatible // indirect
 	github.com/gogo/googleapis v1.1.0 // indirect
-	github.com/gogo/protobuf v1.1.1 // indirect
 	github.com/golang/groupcache v0.0.0-20181024230925-c65c006176ff // indirect
 	github.com/golang/protobuf v1.2.0
 	github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf // indirect
@@ -46,7 +44,6 @@ require (
 	github.com/opencontainers/runc v0.1.1 // indirect
 	github.com/opencontainers/runtime-spec v0.1.2-0.20180710222632-d810dbc60d8c
 	github.com/pkg/errors v0.8.1
-	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sirupsen/logrus v1.0.6 // indirect
 	github.com/spf13/afero v1.2.0 // indirect
 	github.com/spf13/cobra v0.0.3
@@ -60,9 +57,8 @@ require (
 	github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc // indirect
 	github.com/vmware/vmw-guestinfo v0.0.0-20170707015358-25eff159a728
 	golang.org/x/net v0.0.0-20190313220215-9f648a60d977
-	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f // indirect
 	golang.org/x/sys v0.0.0-20190312061237-fead79001313
-	golang.org/x/text v0.3.0
+	golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
 	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c // indirect
 	google.golang.org/genproto v0.0.0-20181221175505-bd9b4fb69e2f // indirect
 	google.golang.org/grpc v1.17.0
@@ -82,6 +78,7 @@ require (
 	k8s.io/cloud-provider v0.0.0-20190323031113-9c9d72d1bf90 // indirect
 	k8s.io/cluster-bootstrap v0.0.0-20190313124217-0fa624df11e9 // indirect
 	k8s.io/component-base v0.0.0-20190313120452-4727f38490bc // indirect
+	k8s.io/cri-api v0.0.0-20190415134236-da91be8ac232
 	k8s.io/klog v0.2.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20190320154901-5e45bb682580 // indirect
 	k8s.io/kube-proxy v0.0.0-20190320190624-78a1c9778e0e // indirect

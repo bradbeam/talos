@@ -6,10 +6,12 @@ package reg
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd"
@@ -31,6 +33,10 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
+
+	//	pb "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	pb "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 // Registrator is the concrete type that implements the factory.Registrator and
@@ -62,7 +68,45 @@ func (r *Registrator) Kubeconfig(ctx context.Context, in *empty.Empty) (data *pr
 // Processes implements the proto.OSDServer interface.
 // nolint: gocyclo
 func (r *Registrator) Processes(ctx context.Context, in *proto.ProcessesRequest) (reply *proto.ProcessesReply, err error) {
-	client, err := containerd.New(defaults.DefaultAddress)
+	// Create connection
+	addr, dialer, err := util.GetAddressAndDialer("unix://" + defaults.DefaultAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(5*time.Second), grpc.WithDialer(dialer))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect, make sure you are running as root and the runtime has been started: %v", err)
+	}
+
+	runtimeClient := pb.NewRuntimeServiceClient(conn)
+
+	request := &pb.ListContainersRequest{
+		Filter: &pb.ContainerFilter{},
+	}
+
+	resp, err := runtimeClient.ListContainers(context.Background(), request)
+	if err != nil {
+		return nil, err
+	}
+
+	processes := make([]*proto.Process, len(resp.Containers))
+	for _, container := range resp.Containers {
+		// This fails becsuse I took out PID
+		process := &proto.Process{
+			// TODO k8s.io namespace seems hardcoded in CRI somehow/somewhere
+			//Namespace: in.Namespace,
+			Id:     container.Id,
+			Image:  container.Image.Image,
+			Status: strings.ToUpper(string(container.State)),
+		}
+		processes = append(processes, process)
+	}
+	return &proto.ProcessesReply{Processes: processes}, nil
+}
+
+/*
+	, err := containerd.New(defaults.DefaultAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +155,7 @@ func (r *Registrator) Processes(ctx context.Context, in *proto.ProcessesRequest)
 	reply = &proto.ProcessesReply{Processes: processes}
 
 	return reply, nil
-}
+*/
 
 // Stats implements the proto.OSDServer interface.
 // nolint: gocyclo
