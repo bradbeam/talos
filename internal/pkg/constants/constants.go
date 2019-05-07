@@ -141,6 +141,15 @@ const (
 
 	// InitSocketPath is the path to file socket of init API
 	InitSocketPath = "/var/lib/init/init.sock"
+
+	// KernelAsset defines a well known name for our kernel filename
+	KernelAsset = "vmlinuz"
+
+	// InitramfsAsset defines a well known name for our initramfs filename
+	InitramfsAsset = "initramfs.xz"
+
+	// RootfsAsset defines a well known name for our rootfs filename
+	RootfsAsset = "rootfs.tar.gz"
 )
 
 // See https://linux.die.net/man/3/klogctl

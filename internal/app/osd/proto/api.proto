@@ -9,6 +9,7 @@ import "google/protobuf/empty.proto";
 //
 // OSD Service also implements all the API of Init Service
 service OSD {
+  rpc DF(google.protobuf.Empty) returns (DFReply) {}
   rpc Dmesg(google.protobuf.Empty) returns (Data) {}
   rpc Kubeconfig(google.protobuf.Empty) returns (Data) {}
   rpc Logs(LogsRequest) returns (stream Data) {}
@@ -18,7 +19,7 @@ service OSD {
   rpc Routes(google.protobuf.Empty) returns (RoutesReply) {}
   rpc Stats(StatsRequest) returns (StatsReply) {}
   rpc Top(google.protobuf.Empty) returns (TopReply) {}
-  rpc DF(google.protobuf.Empty) returns (DFReply) {}
+  rpc Upgrade(UpgradeRequest) returns (UpgradeReply) {}
   rpc Version(google.protobuf.Empty) returns (Data) {}
 }
 
@@ -99,3 +100,10 @@ message DFStat {
   uint64 available = 3;
   string mounted_on = 4;
 }
+
+message UpgradeRequest {
+	string version = 1;
+	string url = 2;
+}
+
+message UpgradeReply { string ack = 1; }
