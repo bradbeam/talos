@@ -311,3 +311,15 @@ func (c *Client) DF() (err error) {
 
 	return nil
 }
+
+// Upgrade initiates a Talos upgrade ... and implements the proto.OSDClient
+// interface
+func (c *Client) Upgrade(version string, asseturl string) (err error) {
+	ctx := context.Background()
+	reply, err := c.client.Upgrade(ctx, &proto.UpgradeRequest{Version: version, Url: asseturl})
+	if err != nil {
+		return
+	}
+	fmt.Println(reply.Ack)
+	return
+}
