@@ -102,8 +102,7 @@ message DFStat {
 }
 
 message UpgradeRequest {
-	string version = 1;
-	string url = 2;
+	string url = 1;
 }
 
 message UpgradeReply { string ack = 1; }

@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	upgradeVersion string
-	assetURL       string
+	assetURL string
+	local    bool
 )
 
 // upgradeCmd represents the processes command
@@ -23,29 +23,41 @@ var upgradeCmd = &cobra.Command{
 	Short: "Upgrade Talos on the target node",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		creds, err := client.NewDefaultClientCredentials(talosconfig)
-		if err != nil {
-			helpers.Fatalf("error getting client credentials: %s", err)
-		}
-		if target != "" {
-			creds.Target = target
-		}
-		c, err := client.NewClient(constants.OsdPort, creds)
-		if err != nil {
-			helpers.Fatalf("error constructing client: %s", err)
+		var err error
+		if local {
+			if err = localUpgrade(); err != nil {
+				helpers.Fatalf("error upgrading host: %s", err)
+			}
+		} else {
+			if err = remoteUpgrade(); err != nil {
+				helpers.Fatalf("error upgrading host: %s", err)
+			}
 		}
 
-		// TODO: See if we can validate version and prevent
-		// starting upgrades to an unknown version
-		if err := c.Upgrade(upgradeVersion, assetURL); err != nil {
-			helpers.Fatalf("error upgrading host: %s", err)
-		}
 	},
 }
 
 func init() {
-	upgradeCmd.Flags().StringVarP(&upgradeVersion, "version", "v", "", "target version to upgrade to")
+	upgradeCmd.Flags().BoolVarP(&local, "local", "l", false, "operate in local mode")
 	upgradeCmd.Flags().StringVarP(&assetURL, "url", "u", "", "url hosting upgrade assets (excluding filename)")
 	upgradeCmd.Flags().StringVarP(&target, "target", "t", "", "target the specificed node")
 	rootCmd.AddCommand(upgradeCmd)
+}
+
+func remoteUpgrade() error {
+	creds, err := client.NewDefaultClientCredentials(talosconfig)
+	if err != nil {
+		return err
+	}
+	if target != "" {
+		creds.Target = target
+	}
+	c, err := client.NewClient(constants.OsdPort, creds)
+	if err != nil {
+		return err
+	}
+
+	// TODO: See if we can validate version and prevent
+	// starting upgrades to an unknown version
+	return c.Upgrade(assetURL)
 }
