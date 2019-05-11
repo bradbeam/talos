@@ -316,7 +316,7 @@ func (c *Client) DF() (err error) {
 // interface
 func (c *Client) Upgrade(asseturl string) (err error) {
 	ctx := context.Background()
-	reply, err := c.client.Upgrade(ctx, &proto.UpgradeRequest{Url: asseturl})
+	reply, err := c.initClient.Upgrade(ctx, &initproto.UpgradeRequest{Url: asseturl})
 	if err != nil {
 		return
 	}
