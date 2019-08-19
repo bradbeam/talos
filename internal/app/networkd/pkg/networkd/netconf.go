@@ -5,14 +5,16 @@
 package networkd
 
 import (
+	"net"
+
 	"github.com/talos-systems/talos/internal/app/networkd/pkg/address"
 	"github.com/talos-systems/talos/internal/app/networkd/pkg/nic"
 	"github.com/talos-systems/talos/pkg/userdata"
 )
 
-// NetConf provides a mapping between an interface name and the functional
+// NetConf provides a mapping between an interface link and the functional
 // options needed to configure the interface
-type NetConf map[string][]nic.Option
+type NetConf map[*net.Interface][]nic.Option
 
 // OverlayUserData translates the supplied userdata to functional options
 func (n *NetConf) OverlayUserData(data *userdata.UserData) error {
@@ -20,23 +22,30 @@ func (n *NetConf) OverlayUserData(data *userdata.UserData) error {
 		return nil
 	}
 
-	for name, opts := range *n {
+	for link, opts := range *n {
 		for _, device := range data.Networking.OS.Devices {
+
 			device := device
-			if name != device.Interface {
+			if link.Name != device.Interface {
 				continue
 			}
 
-			if device.CIDR != "" {
-				s := &address.Static{Device: &device}
+			// Configure Addressing
+			if device.DHCP {
+				d := &address.DHCP{NetIf: link}
+				(*n)[link] = append(opts, nic.WithAddressing(d))
+			}
 
-				(*n)[name] = append(opts, nic.WithAddressing(s))
+			if device.CIDR != "" {
+				s := &address.Static{Device: &device, NetIf: link}
+				(*n)[link] = append(opts, nic.WithAddressing(s))
 			}
 
 			// Configure MTU
 			if device.MTU != 0 {
-				(*n)[name] = append(opts, nic.WithMTU(uint32(device.MTU)))
+				(*n)[link] = append(opts, nic.WithMTU(uint32(device.MTU)))
 			}
+
 		}
 	}
 

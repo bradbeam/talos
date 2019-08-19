@@ -27,10 +27,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Is there any value in returning the low level link or
-	// should the translation to nic be handled here?
-	// links := nwd.Discover()
-
 	// Convert links to nic
 	log.Println("Discovering local network interfaces")
 	netconf, err = nwd.Discover()
@@ -52,9 +48,9 @@ func main() {
 
 	// Configure specified interface
 	netIfaces := make([]*nic.NetworkInterface, 0, len(netconf))
-	for name, opts := range netconf {
+	for link, opts := range netconf {
 		var iface *nic.NetworkInterface
-		log.Printf("Creating interface %s", name)
+		log.Printf("Creating interface %s", link.Name)
 		iface, err = nic.Create(opts...)
 		if err != nil {
 			log.Fatal(err)

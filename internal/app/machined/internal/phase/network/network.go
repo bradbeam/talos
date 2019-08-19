@@ -53,8 +53,8 @@ func (task *UserDefinedNetwork) runtime(platform platform.Platform, data *userda
 	// Configure specified interface
 	netIfaces := make([]*nic.NetworkInterface, 0, len(netconf))
 	var iface *nic.NetworkInterface
-	for name, opts := range netconf {
-		log.Printf("Creating interface %s", name)
+	for link, opts := range netconf {
+		log.Printf("Creating interface %s", link.Name)
 		iface, err = nic.Create(opts...)
 		if err != nil {
 			return err
