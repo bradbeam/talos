@@ -53,6 +53,7 @@ func run() (err error) {
 			rootfs.NewMountCgroupsTask(),
 			rootfs.NewMountSubDevicesTask(),
 			sysctls.NewSysctlsTask(),
+			acpi.NewHandlerTask(),
 		),
 		phase.NewPhase(
 			"basic system configuration",
@@ -96,7 +97,6 @@ func run() (err error) {
 		),
 		phase.NewPhase(
 			"service setup",
-			acpi.NewHandlerTask(),
 			services.NewServicesTask(),
 			signal.NewHandlerTask(),
 		),
