@@ -5,29 +5,17 @@
 package kubeadm
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
-	"math"
 	"os"
 	"path"
-	"path/filepath"
-	"strings"
-	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	kubeadmv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 
-	securityapi "github.com/talos-systems/talos/api/security"
 	"github.com/talos-systems/talos/internal/pkg/cis"
-	"github.com/talos-systems/talos/pkg/cmd"
 	"github.com/talos-systems/talos/pkg/constants"
 	"github.com/talos-systems/talos/pkg/crypto/x509"
-	"github.com/talos-systems/talos/pkg/grpc/middleware/auth/basic"
 	"github.com/talos-systems/talos/pkg/userdata"
 )
 
@@ -35,6 +23,7 @@ const dirPerm os.FileMode = 0700
 const certPerm os.FileMode = 0600
 const keyPerm os.FileMode = 0400
 
+/*
 // PhaseCerts shells out to kubeadm to generate the necessary PKI.
 func PhaseCerts() error {
 	// Run kubeadm init phase certs all. This should fill in whatever gaps
@@ -49,6 +38,7 @@ func PhaseCerts() error {
 		constants.KubeadmConfig,
 	)
 }
+*/
 
 func editFullInitConfig(data *userdata.UserData) (err error) {
 	if data.Services.Kubeadm.InitConfiguration == nil {
@@ -116,8 +106,8 @@ func editClusterConfig(data *userdata.UserData) (err error) {
 	clusterConfiguration.KubernetesVersion = constants.KubernetesVersion
 	clusterConfiguration.UseHyperKubeImage = true
 
-	// Apply CIS hardening recommendations; only generate encryption token only if we're the bootstrap node
-	if err = cis.EnforceMasterRequirements(clusterConfiguration, data.Services.Kubeadm.IsBootstrap()); err != nil {
+	// Apply CIS hardening recommendations; skip token generation since that has moved to userdata
+	if err = cis.EnforceMasterRequirements(clusterConfiguration, false); err != nil {
 		return err
 	}
 	return nil
@@ -210,7 +200,7 @@ func WritePKIFiles(data *userdata.UserData) (err error) {
 			if err = os.MkdirAll(path.Dir(cert.KeyPath), dirPerm); err != nil {
 				return err
 			}
-			if err = ioutil.WriteFile(cert.KeyPath, cert.Cert.Key, certPerm); err != nil {
+			if err = ioutil.WriteFile(cert.KeyPath, cert.Cert.Key, keyPerm); err != nil {
 				return fmt.Errorf("write %s: %v", cert.KeyPath, err)
 			}
 		}
@@ -218,6 +208,7 @@ func WritePKIFiles(data *userdata.UserData) (err error) {
 	return err
 }
 
+/*
 // RequiredFiles returns a slice of the required CA and
 // security policies necessary for kubeadm init to function.
 // This serves as a base for the list of files that need to
@@ -368,3 +359,4 @@ func WriteTrustdFiles(requestedFile string, content []byte) (err error) {
 
 	return err
 }
+*/
