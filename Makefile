@@ -116,13 +116,16 @@ networkd: ## Builds the networkd container image. The build result will be outpu
 ntpd: ## Builds the ntpd container image. The build result will be output to the specified local destination.
 	@$(MAKE) docker-$@ DEST=./$(IMAGES)
 
+ssh: ## Builds the ssh container image. The build result will be output to the specified local destination.
+	@$(MAKE) docker-$@ DEST=./$(IMAGES)
+
 osd: ## Builds the osd container image. The build result will be output to the specified local destination.
 	@$(MAKE) docker-$@ DEST=./$(IMAGES)
 
 trustd: ## Builds the trustd container image. The build result will be output to the specified local destination.
 	@$(MAKE) docker-$@ DEST=./$(IMAGES)
 
-apps: apid machined networkd ntpd osd trustd ## Builds all apps (apid, machined, networkd, ntpd, osd, and trustd).
+apps: apid machined networkd ntpd osd trustd ssh ## Builds all apps (apid, machined, networkd, ntpd, osd, and trustd).
 
 # Local Artifacts
 

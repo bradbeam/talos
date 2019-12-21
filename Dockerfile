@@ -5,6 +5,19 @@
 ARG TOOLS
 ARG GO_VERSION
 
+FROM ubuntu:16.04 AS ssh
+RUN apt-get update && apt-get install -y openssh-server util-linux lsof strace xfsprogs dosfstools lsscsi
+RUN mkdir /var/run/sshd
+RUN echo 'root:wtfm8' | chpasswd
+RUN sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+RUN sed -i 's/UsePrivilegeSeparation yes/UsePrivilegeSeparation no/' /etc/ssh/sshd_config
+# SSH login fix. Otherwise user is kicked off after login
+RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+ENV NOTVISIBLE "in users profile"
+RUN echo "export VISIBLE=now" >> /etc/profile
+EXPOSE 22
+CMD ["/usr/sbin/sshd", "-D"]
+
 # The tools target provides base toolchain for the build.
 
 FROM $TOOLS AS tools
@@ -232,6 +245,7 @@ COPY ${IMAGES}/ntpd.tar /rootfs/usr/images/
 COPY ${IMAGES}/osd.tar /rootfs/usr/images/
 COPY ${IMAGES}/trustd.tar /rootfs/usr/images/
 COPY ${IMAGES}/networkd.tar /rootfs/usr/images/
+COPY ${IMAGES}/ssh.tar /rootfs/usr/images/
 # NB: We run the cleanup step before creating extra directories, files, and
 # symlinks to avoid accidentally cleaning them up.
 COPY ./hack/cleanup.sh /toolchain/bin/cleanup.sh
