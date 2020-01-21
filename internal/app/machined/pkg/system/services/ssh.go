@@ -53,7 +53,7 @@ func (k *SSH) Condition(config runtime.Configurator) conditions.Condition {
 
 // DependsOn implements the Service interface.
 func (k *SSH) DependsOn(config runtime.Configurator) []string {
-	return []string{"system-containerd"}
+	return []string{"networkd"}
 }
 
 // Runner implements the Service interface.
