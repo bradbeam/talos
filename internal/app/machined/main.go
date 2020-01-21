@@ -138,42 +138,47 @@ func main() {
 	// Boot the machine.
 	seq := sequencer.New(sequencer.V1Alpha1)
 
+	flag := unix.LINUX_REBOOT_CMD_RESTART
+
+	shutdownCh := make(chan struct{})
+
+	// Start listening on the event bus
+	go func() {
+		defer close(shutdownCh)
+		for {
+			switch e := <-init.Channel(); e.Type {
+			case event.Shutdown:
+				flag = unix.LINUX_REBOOT_CMD_POWER_OFF
+				fallthrough
+			case event.Reboot:
+				return
+			case event.Upgrade:
+				var (
+					req *machineapi.UpgradeRequest
+					ok  bool
+				)
+
+				if req, ok = e.Data.(*machineapi.UpgradeRequest); !ok {
+					log.Println("cannot perform upgrade, unexpected data type")
+					continue
+				}
+
+				if err := seq.Upgrade(req); err != nil {
+					log.Println(err)
+					panic(fmt.Errorf("upgrade failed: %w", err))
+				}
+
+				return
+			}
+		}
+	}()
+
 	if err := seq.Boot(); err != nil {
 		log.Println(err)
 		panic(fmt.Errorf("boot failed: %w", err))
 	}
 
-	// Wait for an event.
-
-	flag := unix.LINUX_REBOOT_CMD_RESTART
-
-L:
-	for {
-		switch e := <-init.Channel(); e.Type {
-		case event.Shutdown:
-			flag = unix.LINUX_REBOOT_CMD_POWER_OFF
-			fallthrough
-		case event.Reboot:
-			break L
-		case event.Upgrade:
-			var (
-				req *machineapi.UpgradeRequest
-				ok  bool
-			)
-
-			if req, ok = e.Data.(*machineapi.UpgradeRequest); !ok {
-				log.Println("cannot perform upgrade, unexpected data type")
-				continue
-			}
-
-			if err := seq.Upgrade(req); err != nil {
-				log.Println(err)
-				panic(fmt.Errorf("upgrade failed: %w", err))
-			}
-
-			break L
-		}
-	}
+	<-shutdownCh
 
 	if err := seq.Shutdown(); err != nil {
 		log.Println(err)
