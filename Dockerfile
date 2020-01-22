@@ -6,7 +6,47 @@ ARG TOOLS
 ARG GO_VERSION
 
 FROM ubuntu:16.04 AS ssh
-RUN apt-get update && apt-get install -y openssh-server util-linux lsof strace xfsprogs dosfstools lsscsi
+RUN apt-get update && \
+    apt-get install -y \
+      arping \
+      bison \
+      build-essential \
+      build-essential \
+      clang \
+      cmake \
+      dosfstools \
+      flex \
+      gcc-multilib \
+      git \
+      iperf \
+      libclang-6.0-dev \
+      libedit-dev \
+      libelf-dev \
+      libelf-dev \
+      libllvm6.0 \
+      llvm \
+      llvm-6.0-dev \
+      lsof \
+      lsscsi \
+      netperf \
+      openssh-server \
+      python \
+      strace \
+      util-linux \
+      vim \
+      xfsprogs \
+      zlib1g-dev
+RUN git clone https://github.com/iovisor/bcc.git && \
+    mkdir bcc/build; cd bcc/build && \
+    cmake .. -DCMAKE_INSTALL_PREFIX=/usr && \
+    make && \
+    make install
+RUN git clone --recurse-submodules https://github.com/xdp-project/xdp-tutorial
+RUN wget https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.4.11.tar.xz && \
+    tar -xf linux-5.4.11.tar.xz && \
+    cd linux-5.4.11/tools/perf && \
+    make && \
+    mv perf /usr/local/bin
 RUN mkdir /var/run/sshd
 RUN echo 'root:wtfm8' | chpasswd
 RUN sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
